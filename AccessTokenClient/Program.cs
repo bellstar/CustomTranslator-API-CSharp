@@ -40,6 +40,7 @@ namespace CT.AccessToken.Client
 {
     class Program
     {
+        private const char Separator = ',';
         #region Static Fields
 
         private static PublicClientApplication application;
@@ -61,7 +62,8 @@ namespace CT.AccessToken.Client
             apiEndpoint = AccessTokenClient.EndPointAddressV1Prod;
             scopes = AccessTokenClient.Scopes;
 
-            application = new PublicClientApplication(clientId, authorityUri, CachePersistence.GetUserCache());            
+            //application = new PublicClientApplication(clientId, authorityUri, CachePersistence.GetUserCache());
+            application = new PublicClientApplication(clientId, authorityUri, null);
             string idToken = null;
             try
             {
@@ -72,7 +74,7 @@ namespace CT.AccessToken.Client
                 idToken = AcquireTokenWithSignIn();
             }
 
-            Console.WriteLine("Id token Acquired Successfully. Use http://jwt.ms/ to inspect the token.");            
+            Console.WriteLine("Id token Acquired Successfully. Use http://jwt.ms/ to inspect the token.");
             Console.WriteLine("Token:");
             Console.WriteLine(idToken);
             Console.WriteLine();
@@ -80,12 +82,45 @@ namespace CT.AccessToken.Client
             // Get the categories from the Custom Translator api. This just tests that we have a valid auth token.
             Console.WriteLine("Calling Custom Translator categories API to verify auth...");
             restClient = new RestClient(apiEndpoint);
+
+            Console.WriteLine();
+            Console.WriteLine("Get workspace list");
+            GetWorkspaces(idToken);
+
+            Console.WriteLine();
+            Console.WriteLine("Get project list");
             GetCategories(idToken);
+
+            Console.WriteLine();
+            Console.WriteLine("Get document list");
+            GetDocuments(idToken);
+
+            Console.WriteLine();
+            Console.WriteLine("Post Create Model and Train");
+            string modelName = string.Concat(ConfigurationManager.AppSettings["modelNamePrefix"], DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            string pjId = ConfigurationManager.AppSettings["projectId"];
+            List<string> docIdsStr = ConfigurationManager.AppSettings["documentIds"].Split(Separator).ToList<string>();
+            List<int> docIds = new List<int>();
+            foreach(string docIdStr in docIdsStr){
+                docIds.Add(int.Parse(docIdStr));
+            }
+            
+            var modelParam = new ModelCreateRequest()
+            {
+                name = modelName,
+                projectId = pjId,
+                documentIds = docIds,
+                isAutoDeploy = true,
+                isTestingAuto = true,
+                isTuningAuto = true,
+            };
+
+            PostCreateModelRequestItem(idToken, modelParam);
 
             Console.WriteLine();
             Console.WriteLine($"Press any key to exit.");
             Console.ReadKey();
-        }         
+        }
 
         /// <summary>
         /// The silent sign-in. Relies on token cache.
@@ -95,7 +130,7 @@ namespace CT.AccessToken.Client
         {
             var accounts = application.GetAccountsAsync().Result;
             var result = application.AcquireTokenSilentAsync(scopes, accounts.FirstOrDefault()).Result;
-            return result.IdToken;            
+            return result.IdToken;
         }
 
         /// <summary>
@@ -103,23 +138,53 @@ namespace CT.AccessToken.Client
         /// </summary>
         /// <returns></returns>        
         public static string AcquireTokenWithSignIn()
-        {            
+        {
             AuthenticationResult result = application.AcquireTokenAsync(scopes).Result;
-            
-            return result.IdToken;           
-        }        
-        
+            return result.IdToken;
+        }
+
         public static void GetCategories(string token)
-        {                        
-            //RestRequest request = new RestRequest($"/api/texttranslator/v1.0/categories", Method.GET);            
+        {
+            //RestRequest request = new RestRequest($"/api/texttranslator/v1.0/categories", Method.GET);
             //request.AddHeader("Authorization", "Bearer " + token);
 
             IRestResponse response = client.GetItem(token, $"projects?workspaceId={workspaceId}&pageIndex=1");
-            
+
             Console.WriteLine($"StatusCode: {response.StatusCode}");
             Console.WriteLine($"Description: {response.StatusDescription}");
             Console.WriteLine($"Headers: {response.Headers}");
             Console.WriteLine($"Content: {response.Content}");
+        }
+
+        private static void GetWorkspaces(string token)
+        {
+            IRestResponse response = client.GetItem(token, $"workspaces");
+
+            Console.WriteLine($"StatusCode: {response.StatusCode}");
+            Console.WriteLine($"Description: {response.StatusDescription}");
+            Console.WriteLine($"Headers: {response.Headers}");
+            Console.WriteLine($"Content: {response.Content}");
+        }
+
+        private static void GetDocuments(string token)
+        {
+            IRestResponse response = client.GetItem(token, $"documents?workspaceId={workspaceId}&pageIndex=1");
+
+            Console.WriteLine($"StatusCode: {response.StatusCode}");
+            Console.WriteLine($"Description: {response.StatusDescription}");
+            Console.WriteLine($"Headers: {response.Headers}");
+            Console.WriteLine($"Content: {response.Content}");
+        }
+
+        private static void PostCreateModelRequestItem(string token, ModelCreateRequest param)
+        {
+            IRestResponse response = client.CreateModelRequest(token, param);
+
+            Console.WriteLine($"StatusCode: {response.StatusCode}");
+            Console.WriteLine($"Description: {response.StatusDescription}");
+            Console.WriteLine($"Headers: {response.Headers}");
+            Console.WriteLine($"Content: {response.Content}");
+
         }
     }
 }

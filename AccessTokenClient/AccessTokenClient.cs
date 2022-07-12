@@ -135,11 +135,19 @@ namespace CT.AccessToken.Client
         public IRestResponse GetItem(string token, string item)
         {
             RestRequest request = new RestRequest($"/api/texttranslator/v1.0/{item}", Method.GET);
-            
             request.AddHeader("Authorization", "Bearer " + token);
-
             IRestResponse response = restClient.Execute(request);
+            return response;
+        }
 
+        public IRestResponse CreateModelRequest(string token, ModelCreateRequest param)
+        {
+            string paramJson = JsonConvert.SerializeObject(param);
+            RestRequest request = new RestRequest($"/api/texttranslator/v1.0/models", Method.POST);
+            request.AddHeader("Content-Type", "application/json");
+            request.AddHeader("Authorization", "Bearer " + token);
+            request.AddParameter("modelRequest", paramJson, ParameterType.RequestBody);
+            IRestResponse response = restClient.Execute(request);
             return response;
         }
 
